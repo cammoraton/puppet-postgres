@@ -11,7 +11,7 @@ module Puppet
     
     newproperty(:owner) do
       desc "Name of the owner of the database"
-      #We don't autorequire anything yet.
+       # Should probably do an autorequire here.
     end
     
     newproperty(:encoding) do
@@ -49,8 +49,6 @@ For more information see:
 or
 - http://www.postgresql.org/docs/9.0/static/multibyte.html"
     end
-    
-    # TODO: Add an on_create property that does a notify only on creation
-    
+       
   end
 end
