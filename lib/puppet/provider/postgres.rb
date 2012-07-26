@@ -1,5 +1,7 @@
 class Puppet::Provider::Postgres < Puppet::Provider
-  def self.ready?
+  
+  # Is postgres running and ready?
+   def self.ready?
     cmd = []
     cmd << command(:psql)
     cmd << '-c'
@@ -13,12 +15,28 @@ class Puppet::Provider::Postgres < Puppet::Provider
       return false
     end
   end
-
+  
+  # Is there a postgres process?
+  def self.started?
+    cmd = []
+    cmd << command(:pgrep)
+    cmd << 'postgres'
+    raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd)
+    if status == 0
+      return true
+    else
+      return false
+    end   
+  end
+  
+  # There can be a delay in starting up postgres.
   def self.block_until_ready(timeout = 120)
-    Timeout::timeout(timeout) do
-      until ready?
-        debug('Postgres not ready, retrying')
-        sleep 2
+    if started?
+      Timeout::timeout(timeout) do
+        until ready?
+         debug('Postgres not ready, retrying')
+          sleep 2
+        end
       end
     end
   end
