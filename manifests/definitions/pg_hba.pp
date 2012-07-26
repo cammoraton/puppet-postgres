@@ -57,7 +57,7 @@ define pg_hba ( $ensure = 'present',
        $match = "/files${file}/*[type = '${type}'][database = '${database}'][user = '${role}'][address = '${address}'][method = '${method}']"
      }
      default: {
-       fail ("Unrecognized type.  Valid types are 'local', 'host', 'hostssl', and 'hostnossl'")
+       fail("Unrecognized type.  Valid types are 'local', 'host', 'hostssl', and 'hostnossl'")
      }
    }
    
