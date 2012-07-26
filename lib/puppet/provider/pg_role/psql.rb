@@ -6,6 +6,8 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
   desc 'Provider to add, delete, manipulate postgres roles.'
   
   commands :psql => '/usr/bin/psql'
+  commands :pgrep => '/usr/bin/pgrep'
+  
   def self.instances
     
     block_until_ready
@@ -34,7 +36,9 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
     # Run as the postgres user.  This and the cmd should be configurable probably
     # but it's pretty standard
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
-
+    if status != 0
+      self.fail("Error getting roles - #{raw}")
+    end
     # Parse out the users
     raw.split(/\n\r|\n|\r\n/).uniq.each do |user|
       values = user.split('|')
@@ -152,32 +156,53 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
       :createdb   => @resource[:createdb],
       :connlimit  => @resource[:connlimit],
       :login      => @resource[:login],
-      :members    => [],
-      :groups     => [],
       :ensure     => :present
     }
     @property_hash[:groups]  = @resource[:groups]  if ! @resource[:groups].nil?
     @property_hash[:members] = @resource[:members] if ! @resource[:members].nil?
     
+    # Role names that aren't all lowercase need to be enclosed in quotes.
+    # the alternative is to lowercase the value at assignment.
+    role =  ( @property_hash[:name].downcase != @property_hash[:name] ? "\"#{@property_hash[:name]}\"" :  @property_hash[:name] )
+    
     cmd = []
     cmd << command(:psql)
     cmd << '-qAtc'
-    sqlcmd = "CREATE ROLE #{@property_hash[:name]}"
+    
+    # Construct the Query
+    sqlcmd = "CREATE ROLE #{role}"
     sqlcmd << " WITH PASSWORD '#{@resource[:password]}'" unless @resource[:password].nil?
     sqlcmd << ";"
+    
     cmd << sqlcmd
+    
     # We create the actual role here(with password, if set) and settings will be applied during the flush.
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
+    if status != 0
+      self.fail("Error creating role - #{raw}")
+    end
   end
   
   def destroy
     cmd = []
     cmd << command(:psql)
     cmd << '-qAtc'
-    cmd << "DROP ROLE #{@property_hash[:name]};"
+    
+    # Role names that aren't all lowercase need to be enclosed in quotes.
+    # the alternative is to lowercase the value at assignment.
+    role =  ( @property_hash[:name].downcase != @property_hash[:name] ? "\"#{@property_hash[:name]}\"" :  @property_hash[:name] )
+    
+    # This is kind of silly, but it keeps things standard.
+    sqlcmd = ''
+    sqlcmd << "DROP ROLE #{role};"
+
+    cmd << sqlcmd
     
     # We just drop the thing.
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
+    if status != 0
+      self.fail("Error deleting role - #{raw}")
+    end
     @property_hash.clear
   end
   
@@ -185,9 +210,14 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
   # modified in the property_hash.
   def flush
     unless @property_hash.empty?
+      # Names not in lowercase need to be enclosed in quotes
+      role =  ( @property_hash[:name].downcase != @property_hash[:name] ? "\"#{@property_hash[:name]}\"" :  @property_hash[:name] )
+
       cmd = []
       cmd << command(:psql)
       cmd << '-qAtc'
+
+      # Construct the query
       updated = ''
       updated << "ALTER ROLE #{@property_hash[:name]} "
       updated << (@property_hash[:superuser]  == :true ? 'SUPERUSER'  : 'NOSUPERUSER')  << ' ' unless @property_hash[:superuser].nil?
@@ -196,23 +226,57 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
       updated << (@property_hash[:inherits]   == :true ? 'INHERIT'    : 'NOINHERIT')    << ' ' unless @property_hash[:inherits].nil?
       updated << (@property_hash[:login]      == :true ? 'LOGIN'      : 'NOLOGIN')      << ' ' unless @property_hash[:login].nil?
       updated << "CONNECTION LIMIT #{@property_hash[:connlimit]}; "
-      # Right now we can only Grant, because I do not know how to
-      # get the original values to determine what should be granted and what should change
-      # instances would work, but that requeries the database and that seems wasteful as hell.
-      # And revoke all then a regrant might cause problems.
+      
+      # Parse groups and original groups and figure out what to assign/revoke
       unless @property_hash[:groups].empty?
-        warning("Groups: #{@property_hash[:groups]}")
-        @property_hash[:groups].each do |grp|
-          updated << "GRANT #{grp} TO #{@property_hash[:name]}; "
+        grant = @property_hash[:groups]
+        revoke = nil
+        unless @original_groups.nil? or ! @original_groups.is_a? Array or @original_groups.empty?
+          grant = @property_hash[:groups] - @original_groups
+          revoke = @original_groups - @property_hash[:groups]
+        end
+        
+        grant.each do |grp|
+          assign = ( grp.downcase != grp ? "\"#{grp}\"" : grp ) # Mixed case role names need to be in quotes.
+          updated << "GRANT #{assign} TO #{role}; "
+        end
+        unless revoke.nil?
+          revoke.each do |grp|
+            revoke = ( grp.downcase != grp ? "\"#{grp}\"" : grp ) # Mixed case role names need to be in quotes.
+            updated << "REVOKE #{revoke} FROM #{role}; "
+          end
         end
       end
+      
+      # Same as above.
       unless @property_hash[:members].empty?
-        @property_hash[:members].each do |mem|
-          updated << "GRANT #{@property_hash[:name]} TO #{mem}; "
-        end    
+        grant = @property_hash[:members]
+        revoke = nil
+        unless @original_members.nil? or ! @original_members.is_a? Array or @original_members.empty?
+          grant = @property_hash[:members] - @original_groups
+          revoke = @original_members - @property_hash[:members]
+        end
+        
+        grant.each do |grp|
+          assign = ( grp.downcase != grp ? "\"#{grp}\"" : grp ) # Mixed case role names need to be in quotes.
+          updated << "GRANT #{role} TO #{assign}; "
+        end
+        unless revoke.nil?
+          revoke.each do |grp|
+            revoke = ( grp.downcase != grp ? "\"#{grp}\"" : grp ) # Mixed case role names need to be in quotes.
+            updated << "REVOKE #{role} FROM #{revoke}; "
+          end
+        end
       end
+      
       cmd << updated
+      
+      # Actually execute.
       raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
+      
+      if status != 0
+        self.fail("Error updating role - #{raw}")
+      end
     end
   end 
 end

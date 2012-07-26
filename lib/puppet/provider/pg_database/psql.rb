@@ -3,12 +3,13 @@ Puppet::Type.type(:pg_database).provide(:psql, :parent => Puppet::Provider::Post
 
   desc 'Provider to add, delete, manipulate postgres databases.'
   
-  # No whitespace, no tuples, we know what we're querying so we know the order
   commands :psql => '/usr/bin/psql'
-
+  commands :pgrep => '/usr/bin/pgrep'
+  
   def self.instances
     
     block_until_ready
+    
     instances = []
     # This is equivalent to a \l but cleaner format.
     sqlcmd = "SELECT d.datname, r.rolname, d.datacl
@@ -23,7 +24,9 @@ Puppet::Type.type(:pg_database).provide(:psql, :parent => Puppet::Provider::Post
     # Run as the postgres user.  This and the cmd should be configurable probably
     # but it's pretty standard
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
-
+    if status != 0
+      self.fail("Error retrieving databases - #{raw}")
+    end
     # Parse out the databases
     raw.split(/\n\r|\n|\r\n/).uniq.each do |database|
       values = database.split('|')
@@ -36,7 +39,6 @@ Puppet::Type.type(:pg_database).provide(:psql, :parent => Puppet::Provider::Post
             temporary = ( vals.last.match(/T/) ? true : false )
             # We're not doing anything with these yet.
           end
-          #acl { :role => { :create => true/false, :temp => true/false, :connect => true/false }}
         end
       end
       # Need to translate datacl to english
@@ -100,7 +102,10 @@ Puppet::Type.type(:pg_database).provide(:psql, :parent => Puppet::Provider::Post
     cmd = []
     cmd << command(:psql)
     cmd << '-qAtc'
-    sqlcmd = "CREATE DATABASE #{@property_hash[:name]}"
+    
+    database = ( @property_hash[:name].downcase != @property_hash[:name] ? "\"#{@property_hash[:name]}\"" : @property_hash[:name] )
+    
+    sqlcmd = "CREATE DATABASE #{database}"
     sqlcmd << " ENCODING '#{@resource[:encoding]}'" unless @resource[:encoding].nil?
     sqlcmd << " LC_COLLATE '#{@resource[:collate]}'" unless @resource[:collate].nil?
     sqlcmd << " LC_CTYPE '#{@resource[:ctype]}'" unless @resource[:ctype].nil?
@@ -137,9 +142,14 @@ Puppet::Type.type(:pg_database).provide(:psql, :parent => Puppet::Provider::Post
       cmd = []
       cmd << command(:psql)
       cmd << '-qAtc'
+      
+      database = ( @property_hash[:name].downcase != @property_hash[:name] ? "\"#{@property_hash[:name]}\"" : @property_hash[:name] )
+      
       sqlcmd = ""
+      
       unless @property_hash[:owner].nil?
-        sqlcmd << "ALTER DATABASE #{@property_hash[:name]} OWNER TO #{@property_hash[:owner]};"
+        owner = ( @property_hash[:owner].downcase != @property_hash[:owner] ? "\"#{@property_hash[:owner]}\"" : @property_hash[:owner]) 
+        sqlcmd << "ALTER DATABASE #{database} OWNER TO #{owner};"
       end
 
       # Run through the ACL and make changes via GRANT and REVOKE.
