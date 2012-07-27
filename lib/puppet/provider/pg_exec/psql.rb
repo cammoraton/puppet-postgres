@@ -1,9 +1,8 @@
 Puppet::Type.type(:pg_exec).provide(:psql) do
 
-  desc 'Provider to add, delete, manipulate postgres databases.'
+  desc 'Provider which executes SQL commands'
   
   commands :psql => '/usr/bin/psql'
-  commands :pgrep => '/usr/bin/pgrep'
   
   def run
     basecmd = []
@@ -22,12 +21,19 @@ Puppet::Type.type(:pg_exec).provide(:psql) do
       cmd << sqlcmd
       
       raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
-      warning("Got #{status} and #{raw}")
+      
+      # We assume that a failure code means something like function or table
+      # doesn't exist.
       if status == 0
-        unless @resource[:result].nil?
-        # Compare raw to the regex and modify execute
+        execute = false
+        # Right now these two always fail.
+        if ! @resource[:result].nil?
+          # Compare raw to the regex and modify execute
           execute = false
-        else
+        end
+        
+        if ! @resource[:rows].nil?
+          # Check the number of rows against that parameter
           execute = false
         end
       end
@@ -36,13 +42,15 @@ Puppet::Type.type(:pg_exec).provide(:psql) do
     unless execute == false
       cmd = basecmd
       if ! @resource[:command].nil?
+        # Quiet, tuples only, no echo back command, execute command
         cmd << '-qAtc'
         
         sqlcmd = "#{@resource[:command]}"
         
         cmd << sqlcmd   
       elsif ! @resource[:file].nil?
-        cmd << '-qAtf'
+        # Quiet, tuples, no echo back command, file
+        cmd << '-qAtf'  
         
         sqlcmd = "#{@resource[:file]}"
         
@@ -52,11 +60,10 @@ Puppet::Type.type(:pg_exec).provide(:psql) do
       end
       
       raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
-      warning("Got #{status} and #{raw}")
       if status != 0
         self.fail("Error executing SQL - result #{raw}")
       else
-        @ran = true
+        @ran = true  # Set ran to true for status message prettiness
       end
     end
   end
