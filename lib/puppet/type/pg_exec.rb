@@ -34,33 +34,65 @@ module Puppet
 
     newparam(:database) do
       desc "Database to execute and evaluate against."
-      
-      #if value != 'postgres'
-        # Autorequire the database
-      #end
     end
     
     newparam(:role) do
       desc "Role to run the command as.  This is equivalent to connecting over local socket
       as that role"
-      
-      # Require the role.
     end
     
     newparam(:query) do
       desc "Query to run to determine if we should execute our command or not"
-
+      
+      munge do |value|
+        if value.is_a? Array
+          value.each{|val| val.chomp!}.each{|val| val.chop! if val.end_with?(';')}.join('; ') << ';'
+        elsif value.is_a? String
+          value.chomp!
+          value << ';' if ! value.end_with?(';')
+          value
+        else
+           raise ArgumentError "Query property must be an array or string."
+        end
+      end
+    end
+    
+    newparam(:rows) do
+      desc "Number of rows that should be returned.  Uses format:
+        < 1 - Less than 1
+        > 1 - Greater than 1
+          1 - Equal to 1
+       >= 1 - Greater than or equal to 1
+       <= 1 - Less than or equal to 1" 
+      
     end
     
     newparam(:file) do
       desc "Execute SQL command(s) out of a file.  Useful for plugins which place install sql"
       
-      # Check for the file - but don't autorequire it.
+      # Check for the file
+      validate do |value|
+        if ! FileTest.exists?(value)
+          raise Puppet::Error, "Puppet::Type::Pg_Exec: file does not exist."
+        end
+      end
     end
     
     newparam(:command) do
       desc "Raw SQL to run."
-     
+      
+      munge do |value|
+        if value.is_a? Array
+          value.each{|val| val.chomp!}.each{|val| val.chop! if val.end_with?(';')}.join('; ') << ';'
+        elsif value.is_a? String
+          value.chomp!
+          value << ';' if ! value.end_with?(';')
+          value
+        else
+          raise ArgumentError "Command must be an array or string."
+        end
+      end
+  
     end
     
     newparam(:result) do
@@ -68,9 +100,8 @@ module Puppet
     end
     
     newproperty(:status) do
-      # We default to running things on a return code of 1
-      # Which is returned if a table doesn't exist.
-      defaultto "0"
+      # We default to a value here so that this triggers
+      defaultto :run
       
        # Make output a bit prettier
       def change_to_s(currentvalue, newvalue)
@@ -95,6 +126,19 @@ module Puppet
       end
     end
     
+    # Autorequirements - Really basic right now
+    autorequire(:pg_database) do
+      @parameters[:database]
+    end
+     
+    autorequire(:pg_role) do
+      @parameters[:role]
+    end
+     
+    autorequire(:file) do
+      @parameters[:file]
+    end
+     
     # The following was pulled out of Puppet::Exec in order to provide refreshonly as an option.
     # Every time this resource refreshes it queries the database, so you probably want to be able
     # to confine that behavior via that mechanism.
@@ -151,7 +195,7 @@ module Puppet
     # Run the command
     def refresh
       if self.check_all_attributes(true)
-        
+        provider.run
       end
     end
   end
