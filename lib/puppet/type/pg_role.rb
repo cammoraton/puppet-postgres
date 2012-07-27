@@ -7,9 +7,6 @@ module Puppet
     newparam(:name) do
       desc "Name of this role. This value needs to be unique and can not contain commas or pipes."
       
-      
-      
-      # Need to do validation.
       isnamevar
     end
     
@@ -76,9 +73,10 @@ module Puppet
         super
         if value.is_a? Array
           @should.sort!  # Sort these because order in no way matters.
+        elsif value.is_a? String
+          @should = [] << value
         else
-          # Need to redo this so it creates a new array if value is a string.
-          raise Puppet::Error, "Puppet::Type::Pg_Role: groups property must be an array."
+          raise ArgumentError "Groups property must be an array or string."
         end
       end
       # Should probably do an autorequire here.
@@ -93,19 +91,26 @@ module Puppet
       
       Be careful mixing use of this with groups as they are evaluated seperately."
 
+
       def should=(value)
         super
         if value.is_a? Array
-          @should.sort! # Sort these because order in no way matters.
+          @should.sort!  # Sort these because order in no way matters.
+        elsif value.is_a? String
+          @should = [] << value
         else
-          # Need to redo this so it creates a new array if value is a string.
-          raise Puppet::Error, "Puppet::Type::Pg_Role: members property must be an array."
+          raise ArgumentError "Members property must be an array or string."
         end
       end
       
       # Should probably do an autorequire here.
        
       defaultto Array.new
+    end
+    
+    # Autorequire roles
+    autorequire(:pg_role) do
+      # Nothing yet
     end
   end
 end
