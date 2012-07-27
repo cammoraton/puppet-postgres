@@ -49,6 +49,10 @@ For more information see:
 or
 - http://www.postgresql.org/docs/9.0/static/multibyte.html"
     end
-       
+    
+    autorequire(:pg_role) do
+      @parameters[:owner]
+    end
+    
   end
 end
