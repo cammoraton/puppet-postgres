@@ -10,6 +10,12 @@ module Puppet
       isnamevar
     end
     
+    # I had initially set this up as a property, but there just isn't a good way of determining if
+    # it has changed or not.  So now it is a param and only applies on creation
+    newparam(:password) do
+      desc "Password.  Only set on create."
+    end
+    
     newproperty(:superuser) do
       desc "Superuser.  A boolean value that determines if the role is a super user.
             Defaults to false when a role is created, but has no default value here.
@@ -51,17 +57,12 @@ module Puppet
       newvalues(:true, :false)
     end
     
-    newproperty(:password) do
-      desc "Password.  Only set on create."
-    end
-    
     newproperty(:connlimit) do
       desc "Connection limit.  -1 for none"
       # Add validation here, this should be a number
       defaultto '-1'
     end
 
-    # We should probably do some autorequires, but....
     newproperty(:groups, :array_matching => :all) do
       desc "An array of roles that the role is a member of. 
       This is case sensitive and the back-end queries will automatically enclose anything containing uppercase letters
@@ -79,11 +80,9 @@ module Puppet
           raise ArgumentError "Groups property must be an array or string."
         end
       end
-      # Should probably do an autorequire here.
       defaultto Array.new
     end
-    
-    # We should probably do some autorequires, but....
+
     newproperty(:members, :array_matching => :all) do
       desc "An array of roles that are a member of this role.  
       This is case sensitive and the back-end queries will automatically enclose anything containing uppercase letters
@@ -102,9 +101,7 @@ module Puppet
           raise ArgumentError "Members property must be an array or string."
         end
       end
-      
-      # Should probably do an autorequire here.
-       
+             
       defaultto Array.new
     end
     
