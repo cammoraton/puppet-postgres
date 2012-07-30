@@ -15,9 +15,6 @@ add/change them.  We can parse the resource table which is how the users provide
 that may be overkill.
 
 Anyway, there are 3 basic provider/types here:
-
 pg_exec     - a catchall for conditionally executing sql on a postgres server
-
 pg_database - manipulate databases.
-
 pg_role     - manipulate roles.
