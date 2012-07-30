@@ -6,14 +6,19 @@ module Puppet
 
     newparam(:name) do
       desc "Name identifier of this database. This value needs to be unique."
+      # Need to do some validation
       isnamevar
     end
     
     newproperty(:owner) do
       desc "Name of the owner of the database"
-       # Should probably do an autorequire here.
+       # Need to do some validation
     end
     
+    # The following three are properties, but behave as parameters.
+    # I overrode the default behavior/difference by having the getters in the provider return
+    # the @resource value.  I'm still waffling back and forth on having these be changeable
+    # post-initialization.  If I settle on not allowing that, then I'll flip them to params.
     newproperty(:encoding) do
       desc "Encoding.  The character set text/data is stored in.  Defaults to UTF8.
 Note that changing this is very dangerous, so it will only be set when a database is created.
@@ -50,6 +55,7 @@ or
 - http://www.postgresql.org/docs/9.0/static/multibyte.html"
     end
     
+    # Require the role.
     autorequire(:pg_role) do
       @parameters[:owner]
     end
