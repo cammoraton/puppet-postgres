@@ -58,13 +58,17 @@ module Puppet
     end
     
     newparam(:rows) do
-      desc "Number of rows that should be returned.  Uses format:
-        < 1 - Less than 1
-        > 1 - Greater than 1
-          1 - Equal to 1
-       >= 1 - Greater than or equal to 1
-       <= 1 - Less than or equal to 1" 
+      desc "Number of rows that if returned will trigger the command.  Is additive with result.
       
+      Accepts a string which should contain a number and can contain the following operations:
+        <=  less than or equal to      lte
+        <   less than                  lt
+        >=  greater than or equal to   gte
+        >   greater than               gt
+        
+      If no operand is set, defaults to equals(==). 
+      
+      The number of returned rows is evaluated against the expression."
     end
     
     newparam(:file) do
@@ -73,7 +77,7 @@ module Puppet
       # Check for the file
       validate do |value|
         if ! FileTest.exists?(value)
-          raise Puppet::Error, "Puppet::Type::Pg_Exec: file does not exist."
+          raise Puppet::Error, "Puppet::Type::Pg_Exec: file #{value} does not exist."
         end
       end
     end
@@ -97,6 +101,7 @@ module Puppet
     
     newparam(:result) do
       desc "Regex to match result of query against"
+      
     end
     
     newproperty(:status) do
@@ -105,11 +110,7 @@ module Puppet
       
        # Make output a bit prettier
       def change_to_s(currentvalue, newvalue)
-        if ! @ran
-          return "evaluated but not run"
-        else
-          return "evaluated and ran"
-        end
+        return "completed successfully."
       end
       
       # First verify that all of our checks pass.
@@ -128,17 +129,22 @@ module Puppet
     
     # Autorequirements - Really basic right now
     autorequire(:pg_database) do
-      @parameters[:database]
+      self[:database]
     end
      
     autorequire(:pg_role) do
-      @parameters[:role]
+      self[:role]
     end
      
     autorequire(:file) do
-      @parameters[:file]
+      self[:file]
     end
-     
+    
+    # Require the postgres service
+    autorequire(:service) do
+      [ "postgres", "postgresql" ]
+    end
+    
     # The following was pulled out of Puppet::Exec in order to provide refreshonly as an option.
     # Every time this resource refreshes it queries the database, so you probably want to be able
     # to confine that behavior via that mechanism.
