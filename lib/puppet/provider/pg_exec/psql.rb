@@ -1,16 +1,19 @@
 Puppet::Type.type(:pg_exec).provide(:psql) do
 
-  desc 'Provider which executes SQL commands'
+  desc 'Provider to add, delete, manipulate postgres databases.'
   
   commands :psql => '/usr/bin/psql'
-  
+
+  # This is the only thing here.
   def run
     basecmd = []
     basecmd << command(:psql)
-    basecmd << "-U #{@resource[:role]}" unless @resource[:role].nil?
-    basecmd << "-d #{@resource[:database]}" unless @resource[:database].nil?
+    basecmd << "-U" unless @resource[:role].nil?
+    basecmd << "#{@resource[:role]}" unless @resource[:role].nil?
+    basecmd << "-d" unless @resource[:database].nil?
+    basecmd << "#{@resource[:database]}" unless @resource[:database].nil?
     
-    raw = nil
+    # We execute by default.
     execute = true
     unless @resource[:query].nil?
       cmd = basecmd
@@ -21,52 +24,64 @@ Puppet::Type.type(:pg_exec).provide(:psql) do
       cmd << sqlcmd
       
       raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
-      
-      # We assume that a failure code means something like function or table
-      # doesn't exist.
       if status == 0
-        execute = false
-        # Right now these two always fail.
-        if ! @resource[:result].nil?
-          # Compare raw to the regex and modify execute
-          execute = false
-        end
-        
+        execute = false # Got an ok result, so we'll evaluate.
+
         if ! @resource[:rows].nil?
-          # Check the number of rows against that parameter
-          execute = false
+          target_rows   = Integer(@resource[:rows].gsub(/[^\d]/,''))
+          operand = @resource[:rows].gsub(/[\d]/,'').chomp.downcase
+          returned_rows = (raw.length <= 0 ? 0 : raw.lines.count)
+          if operand.match(/lte|less than or equal|<=/)
+            execute = true if returned_rows <= target_rows
+          elsif operand.match(/gte|greater than or equal|>=/)
+            execute = true if returned_rows >= target_rows
+          elsif operand.match(/lt|less than|</)
+            execute = true if returned_rows < target_rows 
+          elsif operand.match(/gt|greater than|>/)
+            execute = true if returned_rows > target_rows
+          else
+            execute = true if returned_rows == target_rows
+          end
         end
+      else
+        # We stop an execution if rows or result params are set
+        # on the assumption that if you want to evaluate against criteria like those
+        # you want to actually do so.
+        execute = false if (! @resource[:rows].nil? or ! @resource[:result].nil?)
       end
     end
     
     unless execute == false
       cmd = basecmd
       if ! @resource[:command].nil?
-        # Quiet, tuples only, no echo back command, execute command
         cmd << '-qAtc'
         
         sqlcmd = "#{@resource[:command]}"
         
         cmd << sqlcmd   
       elsif ! @resource[:file].nil?
-        # Quiet, tuples, no echo back command, file
-        cmd << '-qAtf'  
+        cmd << '-qAtf'
         
         sqlcmd = "#{@resource[:file]}"
         
         cmd << sqlcmd
       else
-        self.fail("Nothing to do.")
+        # Right now we send a warning.  This should still trigger a refresh if you
+        # want to use queries to conditionally do things for some insane reason.
+        self.warning("Nothing to do.")
       end
       
       raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
       if status != 0
         self.fail("Error executing SQL - result #{raw}")
       else
-        @ran = true  # Set ran to true for status message prettiness
+        @ran = true
       end
+    else
+      self.fail("Execution criteria failed.  Failing to prevent dependant resources from executing.")
     end
   end
   
 end
+  
   
