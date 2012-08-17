@@ -72,13 +72,13 @@ define pg_hba ( $ensure = 'present',
         # Need to redo this to exploit that
         # I patched the lens to allow multiple options
         
-        # Do this as a seperate define? So we can do matches per array?
+        # Do this as a seperate define? So we can do matches per option?
         if $option {
           augeas { "add option to ${name}":
             lens => "Pg_Hba.lns",
             incl => $file,
             changes => inline_template("postgres/pg_hba_options.erb"),  # Need to improve this template
-            onlyif => "match ${match}/method/option size == 0",
+            onlyif => "match ${match}/method/option size == 0", #Appending /*[option = 'value'] to the match would work
             require => Augeas["set pg_hba ${name}"],
           }
         }
