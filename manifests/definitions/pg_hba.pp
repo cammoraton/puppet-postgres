@@ -57,7 +57,7 @@ define pg_hba ( $ensure = 'present',
        $match = "/files${file}/*[type = '${type}'][database = '${database}'][user = '${role}'][address = '${address}'][method = '${method}']"
      }
      default: {
-       fail("Unrecognized type.  Valid types are 'local', 'host', 'hostssl', and 'hostnossl'")
+       fail ("Unrecognized type.  Valid types are 'local', 'host', 'hostssl', and 'hostnossl'")
      }
    }
    
@@ -69,7 +69,17 @@ define pg_hba ( $ensure = 'present',
           changes => $changed,
           onlyif => "match ${match} size == 0",
         }
-        # Need to add in method options
+        # Need to redo this to exploit that
+        # I patched the lens to allow multiple options
+        if $option {
+          augeas { "add option to ${name}":
+            lens => "Pg_Hba.lns",
+            incl => $file,
+            changes => "set ${match}/method/option ${option}",
+            onlyif => "match ${xpath}/method/option size == 0",
+            require => Augeas["set pg_hba ${name}"],
+          }
+        }
         # Need to add notify in to reload postgres
      }
      'absent': {

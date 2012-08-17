@@ -13,7 +13,7 @@ define pg_addon ($function     = $name,
 
    case $ensure {
      'present': {
-     # Queries the specified database for the function name(defaults to addon name)
+	   # Queries the specified database for the function name(defaults to addon name)
 	   # and then executes the sql install script if it the check returns 0 rows.
 	   pg_exec { "install addon ${name}":
 	     rows        => '0', 
@@ -45,3 +45,5 @@ define pg_addon ($function     = $name,
 	}
   }
 }
+                  
+                   
