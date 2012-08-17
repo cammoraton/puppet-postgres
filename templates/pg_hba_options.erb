@@ -1,0 +1,7 @@
+<% if option.is_a? Array -%>
+<% option.each do |opt| -%>
+set <%= match %>/method/option[last()+1] <%= opt %>
+<% end -%>
+<% else -%>
+set <%= match %>/method/option ${option} 
+<% end - %>
