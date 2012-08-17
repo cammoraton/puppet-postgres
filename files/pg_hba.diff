@@ -1,0 +1,14 @@
+26,29d25
+<     let char  = /[^#() '"\t\n]|\\\\"/
+<     let dquot = /"([^"\\\n]|\\\\.)*"/                    (* " Emacs, relax *)
+<     let squot = /'[^'\n]*'/
+<
+50,51c46
+<     let option = [ label "option" . store (word|dquot) . [ Sep.equal . label "value" . store (word|dquot) ]? ]
+<
+---
+>     let option = [ label "option" . store word ]
+54c49
+<     let method = [ label "method" . store Rx.word . ( Sep.tab . option )* ]
+---
+>     let method = [ label "method" . store Rx.word . ( Sep.tab . option )? ]
