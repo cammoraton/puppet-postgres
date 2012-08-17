@@ -37,7 +37,7 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
     # but it's pretty standard
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
     if status != 0
-      self.fail("Error getting roles - #{raw}")
+      fail("Error getting roles - #{raw}")
     end
     # Parse out the users
     raw.split(/\n\r|\n|\r\n/).uniq.each do |user|
@@ -95,11 +95,6 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
   
   def members
     @property_hash[:members]
-  end
-  
-  # We bypass the property_hash here to make sure this never triggers a change.
-  def password
-    @resource[:password].nil? ? nil : @resource[:password]
   end
 
   # Setters - These should only be called when the resource already exists.
@@ -179,7 +174,7 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
     # We create the actual role here(with password, if set) and settings will be applied during the flush.
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
     if status != 0
-      self.fail("Error creating role - #{raw}")
+      fail("Error creating role - #{raw}")
     end
   end
   
@@ -201,7 +196,7 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
     # We just drop the thing.
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
     if status != 0
-      self.fail("Error deleting role - #{raw}")
+      fail("Error deleting role - #{raw}")
     end
     @property_hash.clear
   end
@@ -219,7 +214,7 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
 
       # Construct the query
       updated = ''
-      updated << "ALTER ROLE #{@property_hash[:name]} "
+      updated << "ALTER ROLE #{role} "
       updated << (@property_hash[:superuser]  == :true ? 'SUPERUSER'  : 'NOSUPERUSER')  << ' ' unless @property_hash[:superuser].nil?
       updated << (@property_hash[:createdb]   == :true ? 'CREATEDB'   : 'NOCREATEDB')   << ' ' unless @property_hash[:createdb].nil?
       updated << (@property_hash[:createrole] == :true ? 'CREATEROLE' : 'NOCREATEROLE') << ' ' unless @property_hash[:createrole].nil?
@@ -275,7 +270,7 @@ Puppet::Type.type(:pg_role).provide(:psql, :parent => Puppet::Provider::Postgres
       raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd, 'postgres')
       
       if status != 0
-        self.fail("Error updating role - #{raw}")
+        fail("Error updating role - #{raw}")
       end
     end
   end 

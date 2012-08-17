@@ -84,4 +84,3 @@ Puppet::Type.type(:pg_exec).provide(:psql) do
   
 end
   
-  

@@ -77,7 +77,7 @@ module Puppet
       # Check for the file
       validate do |value|
         if ! FileTest.exists?(value)
-          raise Puppet::Error, "Puppet::Type::Pg_Exec: file #{value} does not exist."
+          warning("File #{value} does not exist.")
         end
       end
     end

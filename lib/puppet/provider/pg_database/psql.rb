@@ -146,7 +146,9 @@ Puppet::Type.type(:pg_database).provide(:psql, :parent => Puppet::Provider::Post
   end
   
   # Flush is triggered on anything that has been detected as being
-  # modified in the property_hash.
+  # modified in the property_hash. It generates a temporary file with
+  # the updates that need to be made. The temporary file is then used
+  # as stdin for the psql command.
   def flush
     unless @property_hash.empty?
       cmd = []
@@ -260,4 +262,3 @@ Puppet::Type.type(:pg_database).provide(:psql, :parent => Puppet::Provider::Post
     end
   end
 end
-

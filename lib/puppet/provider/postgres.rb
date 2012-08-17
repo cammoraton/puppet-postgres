@@ -20,6 +20,7 @@ class Puppet::Provider::Postgres < Puppet::Provider
   def self.started?
     cmd = []
     cmd << command(:pgrep)
+    cmd << '-f'
     cmd << 'postgres'
     raw, status = Puppet::Util::SUIDManager.run_and_capture(cmd)
     if status == 0
@@ -38,6 +39,8 @@ class Puppet::Provider::Postgres < Puppet::Provider
           sleep 2
         end
       end
+    else
+      fail('Postgres not started')
     end
   end
 
